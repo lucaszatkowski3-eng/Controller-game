@@ -24,7 +24,7 @@ Race count, wins and best times are stored in `localStorage` on the current devi
 
 ## Android APK
 
-The **Build Android APK** GitHub Actions workflow creates a debug APK and uploads it as the artifact `controller-racing-debug-apk`. Open **Actions → Build Android APK → latest successful run → Artifacts**. Download and unzip the artifact to get `app-debug.apk`. You may need to allow installation from your chosen file manager. Debug APKs are for testing and are not Play Store release builds.
+**Direct download:** after a successful build, get the latest `app-debug.apk` from [GitHub Releases](https://github.com/lucaszatkowski3-eng/Controller-game/releases/latest). The [Build Android APK workflow](https://github.com/lucaszatkowski3-eng/Controller-game/actions/workflows/android-apk.yml) also uploads an artifact named `controller-racing-android-apk` (open the latest successful run → Artifacts). Download the APK, open it on Android, and allow installation from your file manager/browser if prompted. This is a debug/test build, not a Play Store release.
 
 ## Build locally
 
