@@ -22,6 +22,23 @@ function mat(color,roughness=.8,metalness=0){return new THREE.MeshStandardMateri
 function box(parent,w,h,d,material,x=0,y=0,z=0){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m}
 function buildRoad(def){const points=def.points.map(([x,z])=>new THREE.Vector3(x,0,z));trackCurve=new THREE.CatmullRomCurve3(points,true,'catmullrom',.35);const samples=900,segments=trackCurve.getPoints(samples),verts=[],uv=[],indices=[];roadLength=trackCurve.getLength();const half=12;for(let i=0;i<=samples;i++){const p=segments[i],t=trackCurve.getTangentAt(i/samples),side=new THREE.Vector3(-t.z,0,t.x);for(let j=0;j<2;j++){const q=p.clone().addScaledVector(side,j?half:-half);verts.push(q.x,.06,q.z);uv.push(j,i/samples*roadLength/8)}}for(let i=0;i<samples;i++){let a=i*2,b=a+1,c=a+2,d=a+3;indices.push(a,b,c,b,d,c)}const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));geo.setIndex(indices);geo.computeVertexNormals();roadMesh=new THREE.Mesh(geo,mat(def.road,.94));roadMesh.receiveShadow=true;scene.add(roadMesh);
 for(const sideSign of [-1,1]){const railPts=[];for(let i=0;i<=samples;i++){const p=segments[i],t=trackCurve.getTangentAt(i/samples),side=new THREE.Vector3(-t.z,0,t.x);railPts.push(p.clone().addScaledVector(side,sideSign*14))}const rail=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(railPts),samples,.28,6,true),mat(def.edge,.4,.2));rail.position.y=.35;scene.add(rail);const linePts=[];for(let i=0;i<=samples;i+=3){const p=segments[i],t=trackCurve.getTangentAt(i/samples),side=new THREE.Vector3(-t.z,0,t.x);linePts.push(p.clone().addScaledVector(side,sideSign*11.5).add(new THREE.Vector3(0,.12,0)))}const line=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(linePts),linePts.length, .08,5,false),mat(def.edge));scene.add(line)}
+
+ // Dashed racing line and alternating red/white kerbs for stronger track definition.
+ const dashMat=mat(0xf1f4e9,.72),redKerb=mat(0xe84b46,.62),whiteKerb=mat(0xf3f2e8,.62);
+ for(let i=0;i<100;i++){
+   const t=(i+.5)/100,p=trackCurve.getPointAt(t),tan=trackCurve.getTangentAt(t);
+   const dash=new THREE.Mesh(new THREE.BoxGeometry(.18,.035,2.6),dashMat);
+   dash.position.set(p.x,.105,p.z);dash.rotation.y=Math.atan2(tan.x,tan.z);scene.add(dash);
+ }
+ for(let i=0;i<Math.floor(samples/5);i++){
+   const t=(i*5)/samples,p=trackCurve.getPointAt(t),tan=trackCurve.getTangentAt(t),side=new THREE.Vector3(-tan.z,0,tan.x);
+   for(const sign of [-1,1]){
+     const q=p.clone().addScaledVector(side,sign*12.55);
+     const curb=new THREE.Mesh(new THREE.BoxGeometry(.9,.16,2.1),i%2?redKerb:whiteKerb);
+     curb.position.set(q.x,.12,q.z);curb.rotation.y=Math.atan2(tan.x,tan.z);curb.receiveShadow=true;scene.add(curb);
+   }
+ }
+
 // start/finish stripe
 const start=trackCurve.getPointAt(.015),tan=trackCurve.getTangentAt(.015);const stripe=new THREE.Mesh(new THREE.PlaneGeometry(24,3),mat(0xf4f7fa,.5));stripe.rotation.x=-Math.PI/2;stripe.rotation.y=Math.atan2(tan.x,tan.z);stripe.position.set(start.x,.13,start.z);scene.add(stripe);for(let i=0;i<12;i++){const tile=box(scene,2,.06,1.5,mat(i%2?0x17202d:0xffffff),start.x+(i-5.5)*2,.16,start.z);tile.rotation.y=Math.atan2(tan.x,tan.z)}
 }
@@ -31,7 +48,52 @@ for(let i=0;i<190;i++){const t=(i/190+Math.random()*.002)%1,p=trackCurve.getPoin
 // low-detail grandstands at a few locations
 for(let j=0;j<4;j++){const p=trackCurve.getPointAt(.12+j*.23),t=trackCurve.getTangentAt(.12+j*.23),side=new THREE.Vector3(-t.z,0,t.x),pos=p.clone().addScaledVector(side,j%2?35:-35);const stand=new THREE.Group();stand.position.set(pos.x,0,pos.z);stand.rotation.y=Math.atan2(t.x,t.z);for(let row=0;row<4;row++){const seat=box(stand,22,.7,2.5,mat([0x304f77,0xc1d5e8,0xe6a54e][row%3]),0,1+row*.8,row*1.7);seat.rotation.x=-.08}scene.add(stand)}
 }
-function makeCar(color,playerIndex=-1){const root=new THREE.Group();const bodyMat=mat(color,.32,.3),dark=mat(0x111925,.25,.15),glass= new THREE.MeshStandardMaterial({color:0x9ed5e9,metalness:.25,roughness:.18,transparent:true,opacity:.88}),rubber=mat(0x101116,.95),lamp=mat(0xf8f1c5,.22),tail=mat(0xff382c,.3);box(root,2.25,.62,4.1,bodyMat,0,.7,0);box(root,1.45,.65,1.75,bodyMat,0,1.22,-.25);box(root,1.28,.5,1.48,glass,0,1.48,-.23);box(root,2.0,.12,.65,dark,0,.94,1.7);box(root,1.75,.13,.42,dark,0,.94,-1.65);for(const x of [-1,1]){for(const z of [-1.25,1.25]){const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.43,.43,.28,16),rubber);wheel.rotation.z=Math.PI/2;wheel.position.set(x*1.08,.43,z);wheel.castShadow=true;root.add(wheel)}box(root,.35,.18,.12,lamp,x*.65,.76,2.03);box(root,.42,.18,.1,tail,x*.65,.77,-2.04)}const driver=box(root,.48,.4,.42,mat(0x253344),0,1.65,-.22);root.userData={playerIndex,bodyMat};scene.add(root);return root}
+function makeCar(color,playerIndex=-1){
+  const root=new THREE.Group();
+  const paint=new THREE.MeshPhysicalMaterial({color,roughness:.24,metalness:.42,clearcoat:1,clearcoatRoughness:.14});
+  const carbon=mat(0x111820,.38,.35),glass=new THREE.MeshPhysicalMaterial({color:0x79bfd5,metalness:.2,roughness:.12,transparent:true,opacity:.9,clearcoat:1}),rubber=mat(0x090c11,.96),rim=mat(0xb7c7d2,.24,.82),rimDark=mat(0x354451,.4,.72);
+  const head=new THREE.MeshStandardMaterial({color:0xf4ffff,emissive:0xc4f3ff,emissiveIntensity:1.7,roughness:.18});
+  const tail=new THREE.MeshStandardMaterial({color:0xff281c,emissive:0xf01b0d,emissiveIntensity:1.2,roughness:.24});
+  // Sculpted-looking layered GT body, low nose, cockpit and rear aero.
+  box(root,2.08,.42,4.12,paint,0,.68,-.02);
+  box(root,1.92,.26,1.42,paint,0,.84,.95);
+  const nose=box(root,1.78,.22,1.0,paint,0,.73,1.77);nose.rotation.x=-.07;
+  box(root,1.72,.13,.5,carbon,0,.51,2.04);
+  box(root,1.88,.12,.55,carbon,0,.48,-1.86);
+  box(root,1.64,.12,.38,paint,0,.88,-1.68);
+  // Cabin and panoramic windscreen.
+  const cabin=box(root,1.36,.57,1.72,paint,0,1.13,-.24);cabin.rotation.x=-.05;
+  const windshield=box(root,1.18,.42,.08,glass,0,1.39,.53);windshield.rotation.x=-.35;
+  const rearGlass=box(root,1.15,.38,.08,glass,0,1.38,-1.03);rearGlass.rotation.x=.34;
+  box(root,1.2,.07,.88,carbon,0,1.42,-.22);
+  // Wheel assemblies with metallic multi-spoke rims and visible brake discs.
+  const wheelPivots=[];
+  for(const x of [-1,1]) for(const z of [-1.28,1.28]){
+    const pivot=new THREE.Group();pivot.position.set(x*1.01,.48,z);root.add(pivot);wheelPivots.push(pivot);
+    const tire=new THREE.Mesh(new THREE.CylinderGeometry(.43,.43,.28,24),rubber);tire.rotation.z=Math.PI/2;tire.castShadow=true;pivot.add(tire);
+    const disk=new THREE.Mesh(new THREE.CylinderGeometry(.285,.285,.295,20),rimDark);disk.rotation.z=Math.PI/2;disk.position.x=x*.012;pivot.add(disk);
+    const face=new THREE.Mesh(new THREE.CylinderGeometry(.235,.235,.305,10),rim);face.rotation.z=Math.PI/2;face.position.x=x*.018;pivot.add(face);
+    for(let k=0;k<5;k++){const spoke=box(pivot,.035,.36,.055,rim,0,0,0);spoke.position.set(x*.17,Math.sin(k*Math.PI*2/5)*.15,Math.cos(k*Math.PI*2/5)*.15);spoke.rotation.x=k*Math.PI*2/5}
+    const hub=new THREE.Mesh(new THREE.CylinderGeometry(.075,.075,.32,12),carbon);hub.rotation.z=Math.PI/2;pivot.add(hub);
+    box(root,.14,.2,.18,paint,x*1.02,.76,z>0?1.22:-1.22);
+  }
+  // Mirrors, side skirts, vents, splitter, wing and tail lights.
+  for(const x of [-1,1]){
+    box(root,.12,.18,.52,carbon,x*1.02,.61,0);
+    const mirror=box(root,.28,.12,.22,paint,x*1.1,1.12,.38);mirror.rotation.z=x*.12;
+    box(root,.08,.12,1.35,carbon,x*1.01,.43,-.05);
+    box(root,.18,.1,.28,head,x*.62,.73,2.12);
+    box(root,.22,.12,.16,tail,x*.65,.78,-2.02);
+    for(let v=0;v<3;v++)box(root,.035,.09,.34,carbon,x*.72,.72,-.8+v*.15);
+  }
+  const wingSupport1=box(root,.08,.32,.08,carbon,-.62,1.05,-1.72),wingSupport2=box(root,.08,.32,.08,carbon,.62,1.05,-1.72);
+  const wing=box(root,2.05,.1,.38,paint,0,1.25,-1.75);wing.rotation.x=-.04;
+  box(root,2.25,.09,.3,carbon,0,.43,2.14);
+  // A faint underbody glow makes each selectable car readable at night.
+  const glow=new THREE.PointLight(color,.65,5);glow.position.set(0,.25,0);root.add(glow);
+  root.userData={playerIndex,bodyMat:paint,wheelPivots};
+  scene.add(root);return root
+}
 function getPose(progress,lateral=0){const t=((progress%roadLength)+roadLength)%roadLength/roadLength,p=trackCurve.getPointAt(t),tan=trackCurve.getTangentAt(t),side=new THREE.Vector3(-tan.z,0,tan.x);p.addScaledVector(side,lateral);return{p,tan,angle:Math.atan2(tan.x,tan.z)}}
 function createRacer({playerIndex=-1,color,progress,lateral=0,skill=1}){const mesh=makeCar(color,playerIndex);const car={mesh,playerIndex,color,progress,lateral,speed:0,skill,laps:0,lastLap:0,previousProgress:progress,steer:0,finished:false,boost:0};allCars.push(car);if(playerIndex>=0)playerCars.push(car);else aiCars.push(car);const pose=getPose(progress,lateral);mesh.position.copy(pose.p);mesh.position.y=.2;mesh.rotation.y=pose.angle;return car}
 function clearScene(){if(renderer){renderer.dispose();}scene=null;camera=null;camera2=null;playerCars=[];aiCars=[];allCars=[];decor=[]}
