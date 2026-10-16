@@ -5,6 +5,9 @@ on:
     branches: [main, master]
     paths:
       - 'index.html'
+      - 'src/**'
+      - 'public/**'
+      - 'vite.config.js'
       - 'manifest.webmanifest'
       - 'sw.js'
       - 'package.json'
