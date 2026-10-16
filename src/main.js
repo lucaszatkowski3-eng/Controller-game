@@ -23,21 +23,24 @@ function box(parent,w,h,d,material,x=0,y=0,z=0){const m=new THREE.Mesh(new THREE
 function buildRoad(def){const points=def.points.map(([x,z])=>new THREE.Vector3(x,0,z));trackCurve=new THREE.CatmullRomCurve3(points,true,'catmullrom',.35);const samples=900,segments=trackCurve.getPoints(samples),verts=[],uv=[],indices=[];roadLength=trackCurve.getLength();const half=12;for(let i=0;i<=samples;i++){const p=segments[i],t=trackCurve.getTangentAt(i/samples),side=new THREE.Vector3(-t.z,0,t.x);for(let j=0;j<2;j++){const q=p.clone().addScaledVector(side,j?half:-half);verts.push(q.x,.06,q.z);uv.push(j,i/samples*roadLength/8)}}for(let i=0;i<samples;i++){let a=i*2,b=a+1,c=a+2,d=a+3;indices.push(a,b,c,b,d,c)}const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));geo.setIndex(indices);geo.computeVertexNormals();roadMesh=new THREE.Mesh(geo,mat(def.road,.94));roadMesh.receiveShadow=true;scene.add(roadMesh);
 for(const sideSign of [-1,1]){const railPts=[];for(let i=0;i<=samples;i++){const p=segments[i],t=trackCurve.getTangentAt(i/samples),side=new THREE.Vector3(-t.z,0,t.x);railPts.push(p.clone().addScaledVector(side,sideSign*14))}const rail=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(railPts),samples,.28,6,true),mat(def.edge,.4,.2));rail.position.y=.35;scene.add(rail);const linePts=[];for(let i=0;i<=samples;i+=3){const p=segments[i],t=trackCurve.getTangentAt(i/samples),side=new THREE.Vector3(-t.z,0,t.x);linePts.push(p.clone().addScaledVector(side,sideSign*11.5).add(new THREE.Vector3(0,.12,0)))}const line=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(linePts),linePts.length, .08,5,false),mat(def.edge));scene.add(line)}
 
- // Dashed racing line and alternating red/white kerbs for stronger track definition.
- const dashMat=mat(0xf1f4e9,.72),redKerb=mat(0xe84b46,.62),whiteKerb=mat(0xf3f2e8,.62);
+ // Instanced dashed racing line and red/white kerbs: detailed visuals without hundreds of draw calls.
+ const dashMat=mat(0xf1f4e9,.72),redKerb=mat(0xe84b46,.62),whiteKerb=mat(0xf3f2e8,.62),dummy=new THREE.Object3D();
+ const dashInstances=new THREE.InstancedMesh(new THREE.BoxGeometry(.18,.035,2.6),dashMat,100);
  for(let i=0;i<100;i++){
    const t=(i+.5)/100,p=trackCurve.getPointAt(t),tan=trackCurve.getTangentAt(t);
-   const dash=new THREE.Mesh(new THREE.BoxGeometry(.18,.035,2.6),dashMat);
-   dash.position.set(p.x,.105,p.z);dash.rotation.y=Math.atan2(tan.x,tan.z);scene.add(dash);
+   dummy.position.set(p.x,.105,p.z);dummy.rotation.set(0,Math.atan2(tan.x,tan.z),0);dummy.updateMatrix();dashInstances.setMatrixAt(i,dummy.matrix);
  }
- for(let i=0;i<Math.floor(samples/5);i++){
+ dashInstances.instanceMatrix.needsUpdate=true;scene.add(dashInstances);
+ const curbCount=Math.floor(samples/5),redCurbs=new THREE.InstancedMesh(new THREE.BoxGeometry(.9,.16,2.1),redKerb,curbCount),whiteCurbs=new THREE.InstancedMesh(new THREE.BoxGeometry(.9,.16,2.1),whiteKerb,curbCount);
+ let redIndex=0,whiteIndex=0;
+ for(let i=0;i<curbCount;i++){
    const t=(i*5)/samples,p=trackCurve.getPointAt(t),tan=trackCurve.getTangentAt(t),side=new THREE.Vector3(-tan.z,0,tan.x);
    for(const sign of [-1,1]){
-     const q=p.clone().addScaledVector(side,sign*12.55);
-     const curb=new THREE.Mesh(new THREE.BoxGeometry(.9,.16,2.1),i%2?redKerb:whiteKerb);
-     curb.position.set(q.x,.12,q.z);curb.rotation.y=Math.atan2(tan.x,tan.z);curb.receiveShadow=true;scene.add(curb);
+     const q=p.clone().addScaledVector(side,sign*12.55);dummy.position.set(q.x,.12,q.z);dummy.rotation.set(0,Math.atan2(tan.x,tan.z),0);dummy.updateMatrix();
+     if(i%2){redCurbs.setMatrixAt(redIndex++,dummy.matrix)}else{whiteCurbs.setMatrixAt(whiteIndex++,dummy.matrix)}
    }
  }
+ redCurbs.count=redIndex;whiteCurbs.count=whiteIndex;redCurbs.instanceMatrix.needsUpdate=true;whiteCurbs.instanceMatrix.needsUpdate=true;scene.add(redCurbs,whiteCurbs);
 
 // start/finish stripe
 const start=trackCurve.getPointAt(.015),tan=trackCurve.getTangentAt(.015);const stripe=new THREE.Mesh(new THREE.PlaneGeometry(24,3),mat(0xf4f7fa,.5));stripe.rotation.x=-Math.PI/2;stripe.rotation.y=Math.atan2(tan.x,tan.z);stripe.position.set(start.x,.13,start.z);scene.add(stripe);for(let i=0;i<12;i++){const tile=box(scene,2,.06,1.5,mat(i%2?0x17202d:0xffffff),start.x+(i-5.5)*2,.16,start.z);tile.rotation.y=Math.atan2(tan.x,tan.z)}
