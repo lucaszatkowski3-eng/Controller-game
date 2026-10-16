@@ -1,0 +1,13 @@
+{
+  "name":"Controller Racing",
+  "short_name":"Controller Racing",
+  "description":"Arcade-Rennspiel mit Gamepad-, Touch- und Tastatursteuerung.",
+  "start_url":"./",
+  "scope":"./",
+  "display":"fullscreen",
+  "orientation":"landscape",
+  "background_color":"#080d18",
+  "theme_color":"#08101e",
+  "categories":["games","entertainment"],
+  "icons":[]
+}
